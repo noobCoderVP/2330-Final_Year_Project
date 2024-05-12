@@ -3,16 +3,16 @@ from ryu.controller.handler import MAIN_DISPATCHER, DEAD_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.lib import hub
 
-import switch
+import switchm
 from datetime import datetime
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score
 
-class SimpleMonitor13(switch.SimpleSwitch13):
+class SimpleMonitor13(switchm.SimpleSwitch13):
 
     def __init__(self, *args, **kwargs):
 
@@ -119,7 +119,7 @@ class SimpleMonitor13(switch.SimpleSwitch13):
 
         self.logger.info("Flow Training ...")
 
-        flow_dataset = pd.read_csv('FlowStatsfile.csv')
+        flow_dataset = pd.read_csv('dataset.csv')
 
         flow_dataset.iloc[:, 2] = flow_dataset.iloc[:, 2].str.replace('.', '')
         flow_dataset.iloc[:, 3] = flow_dataset.iloc[:, 3].str.replace('.', '')
@@ -132,23 +132,27 @@ class SimpleMonitor13(switch.SimpleSwitch13):
 
         X_flow_train, X_flow_test, y_flow_train, y_flow_test = train_test_split(X_flow, y_flow, test_size=0.25, random_state=0)
 
-        classifier = RandomForestClassifier(n_estimators=10, criterion="entropy", random_state=0)
+        classifier = KNeighborsClassifier(n_neighbors=5, metric='minkowski', p=2)
         self.flow_model = classifier.fit(X_flow_train, y_flow_train)
 
         y_flow_pred = self.flow_model.predict(X_flow_test)
+        y_flow_pred_train = self.flow_model.predict(X_flow_train)
 
         self.logger.info("------------------------------------------------------------------------------")
 
-        self.logger.info("confusion matrix")
+        self.logger.info("Confusion Matrix")
         cm = confusion_matrix(y_flow_test, y_flow_pred)
         self.logger.info(cm)
 
-        acc = accuracy_score(y_flow_test, y_flow_pred)
+       #acc = accuracy_score(y_flow_test, y_flow_pred)
 
-        self.logger.info("succes accuracy = {0:.2f} %".format(acc*100))
-        fail = 1.0 - acc
-        self.logger.info("fail accuracy = {0:.2f} %".format(fail*100))
-        self.logger.info("------------------------------------------------------------------------------")
+       # acc_train = accuracy_score(y_flow_train, y_flow_pred_train)
+       # print("Training Accuracy: ",acc_train)
+
+       # self.logger.info("Succes Accuracy = {0:.2f} %".format(acc*100))
+       # fail = 1.0 - acc
+       # self.logger.info("Fail Accuracy = {0:.2f} %".format(fail*100))
+       # self.logger.info("------------------------------------------------------------------------------")
 
     def flow_predict(self):
         try:
@@ -178,10 +182,12 @@ class SimpleMonitor13(switch.SimpleSwitch13):
 
             self.logger.info("------------------------------------------------------------------------------")
             if (legitimate_trafic/len(y_flow_pred)*100) > 80:
-                self.logger.info("legitimate trafic ...")
+                self.logger.info("Traffic is Legitimate!")
             else:
-                self.logger.info("ddos trafic ...")
-                self.logger.info("victim is host: h{}".format(victim))
+                self.logger.info("NOTICE!! DoS Attack in Progress!!!")
+                self.logger.info("Victim Host: h{}".format(victim))
+                print("Mitigation process in progress!")
+                self.mitigation = 1
 
             self.logger.info("------------------------------------------------------------------------------")
             
