@@ -2,9 +2,9 @@ from ryu.controller import ofp_event
 from ryu.controller.handler import MAIN_DISPATCHER, DEAD_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.lib import hub
-
+from ryu.lib.packet import ipv4
 import switch
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -12,20 +12,30 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score
 
+SERVICE_TYPES = {
+    0: 'eco_i',
+    21: 'FTP',       # File Transfer Protocol (FTP)
+    22: 'SSH',       # Secure Shell (SSH)
+    23: 'Telnet',    # Telnet
+    25: 'SMTP',      # Simple Mail Transfer Protocol (SMTP)
+    53: 'DNS',       # Domain Name System (DNS)
+    80: 'HTTP',      # Hypertext Transfer Protocol (HTTP)
+    110: 'POP3',     # Post Office Protocol version 3 (POP3)
+    123: 'NTP',      # Network Time Protocol (NTP)
+    143: 'IMAP',     # Internet Message Access Protocol (IMAP)
+    443: 'HTTPS',    # HTTP Secure (HTTPS)
+    3306: 'MySQL',   # MySQL Database Server
+    3389: 'RDP',
+    8080: 'http'# Remote Desktop Protocol (RDP)
+}
+
 class SimpleMonitor13(switch.SimpleSwitch13):
 
     def __init__(self, *args, **kwargs):
-
+        self.PROTOCOL_NAME = {1 : 'icmp', 6 : 'tcp', 17 : 'udp'}
         super(SimpleMonitor13, self).__init__(*args, **kwargs)
         self.datapaths = {}
         self.monitor_thread = hub.spawn(self._monitor)
-
-        start = datetime.now()
-
-        # self.flow_training()
-
-        end = datetime.now()
-        print("Training time: ", (end-start))
 
     @set_ev_cls(ofp_event.EventOFPStateChange,
                 [MAIN_DISPATCHER, DEAD_DISPATCHER])
@@ -69,6 +79,9 @@ class SimpleMonitor13(switch.SimpleSwitch13):
         tp_src = 0
         tp_dst = 0
 
+        flows = {}
+        counts = {}
+        srv_counts = {}
         for stat in sorted([flow for flow in body if (flow.priority == 1) ], key=lambda flow:
             (flow.match['eth_type'],flow.match['ipv4_src'],flow.match['ipv4_dst'],flow.match['ip_proto'])):
         
@@ -76,17 +89,49 @@ class SimpleMonitor13(switch.SimpleSwitch13):
             ip_dst = stat.match['ipv4_dst']
             ip_proto = stat.match['ip_proto']
             
+            # * it is an icmp packet
             if stat.match['ip_proto'] == 1:
                 icmp_code = stat.match['icmpv4_code']
                 icmp_type = stat.match['icmpv4_type']
-                
+            
+            # * it is a tcp packet
             elif stat.match['ip_proto'] == 6:
                 tp_src = stat.match['tcp_src']
                 tp_dst = stat.match['tcp_dst']
 
+            # * it is a udp packet
             elif stat.match['ip_proto'] == 17:
                 tp_src = stat.match['udp_src']
                 tp_dst = stat.match['udp_dst']
+            
+            else:
+                continue
+            
+            protocol_type = self.PROTOCOL_NAME[ip_proto]
+            duration = stat.duration_sec
+            if tp_dst in SERVICE_TYPES:
+                service = SERVICE_TYPES[tp_dst]
+            else:
+                service = 'private'            
+            
+            if (ip_src, ip_dst, protocol_type) not in flows:
+                flows[(ip_src, ip_dst, protocol_type)] = {}
+                flows[(ip_src, ip_dst, protocol_type)]['bytes'] = 0
+                
+            flows[(ip_src, ip_dst, protocol_type)]['bytes'] += stat.byte_count
+            flows[(ip_src, ip_dst, protocol_type)]['duration'] = duration
+            flows[(ip_src, ip_dst, protocol_type)]['service'] = service
+                
+            if ip_dst in counts:
+                counts[ip_dst].append(datetime.now())
+            else:
+                counts[ip_dst] = [datetime.now()]
+                
+            if tp_dst in srv_counts:
+                srv_counts[tp_dst].append(datetime.now())
+            else:
+                srv_counts[tp_dst] = [datetime.now()]
+                
 
             flow_id = str(ip_src) + str(tp_src) + str(ip_dst) + str(tp_dst) + str(ip_proto)
           
@@ -113,6 +158,22 @@ class SimpleMonitor13(switch.SimpleSwitch13):
                         packet_count_per_second,packet_count_per_nsecond,
                         byte_count_per_second,byte_count_per_nsecond))
             
+        stats = []
+        current_time = datetime.now()
+        for key, value in flows.items():
+            stat = {}
+            stat['duration'] = value['duration']
+            stat['service'] = value['service']
+            stat['protocol_type'] = key[2]
+            stat['src_bytes'] = value['bytes']
+            if flows[(key[1], key[0], protocol_type)]:
+                stat['dst_bytes'] = flows[(key[1], key[0], protocol_type)]['bytes']
+            else:
+                stat['dst_bytes'] = 0
+            stat['count'] = sum(1 for ts in counts[ip_dst] if (current_time - ts) < timedelta(seconds=2))
+            stat['srv_count'] = sum(1 for ts in srv_counts[tp_dst] if (current_time - ts) < timedelta(seconds=2))
+            stats.append(stat)
+        self.logger.info(stats)
         # file0.close()
 
     # def flow_training(self):
