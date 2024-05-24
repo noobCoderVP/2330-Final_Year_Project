@@ -15,6 +15,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score
 import json
+import pymongo
 
 SERVICE_TYPES = {
     0: 'eco_i',
@@ -53,6 +54,7 @@ class SimpleMonitor13(switch.SimpleSwitch13):
         self.le_label = joblib.load("ML/label.joblib")
         self.sc = joblib.load("ML/scaler.joblib")
         self.datapaths = {}
+        self.db = pymongo.MongoClient('mongodb+srv://vaibhav:Vaibhav%40143@cluster0.nm9w35r.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0')['ids']
         self.monitor_thread = hub.spawn(self._monitor)
         
     def send_websocket_message(self, message):
@@ -188,7 +190,8 @@ class SimpleMonitor13(switch.SimpleSwitch13):
             'src_bytes': [],
             'dst_bytes': [],
             'count': [],
-            'srv_count': []
+            'srv_count': [],
+            'timestamp': [],
         }
         current_time = datetime.now()
         for key, value in flows.items():
@@ -202,6 +205,7 @@ class SimpleMonitor13(switch.SimpleSwitch13):
                 stats['dst_bytes'].append(0)
             stats['count'].append(sum(1 for ts in counts[ip_dst] if (current_time - ts) < timedelta(seconds=2)))
             stats['srv_count'].append(sum(1 for ts in srv_counts[tp_dst] if (current_time - ts) < timedelta(seconds=2)))
+            stats['timestamp'].append(datetime.now().isoformat())
         
         if len(stats['count']) == 0:
             return
@@ -223,6 +227,8 @@ class SimpleMonitor13(switch.SimpleSwitch13):
             stats[i] = list(stats[i])
         stats['attack'] = list(pred)
         self.send_websocket_message(json.dumps(stats, cls=NpEncoder))
+        self.db['logs'].insert_many(pd.DataFrame(stats).to_dict(orient='records'))
+        print('inserted')
         self.logger.info(stats)
         # file0.close()
 
