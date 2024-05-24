@@ -1,7 +1,5 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 import warnings
 from sklearn.svm import SVC
 import statsmodels.api as sm
@@ -24,19 +22,6 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import RocCurveDisplay
 from itertools import cycle
 from sklearn.model_selection import GridSearchCV
-from mlxtend.plotting import plot_confusion_matrix
-from sklearn.ensemble import GradientBoostingClassifier
-import xgboost as xgb
-import lightgbm as lgb
-from catboost import CatBoostClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
-from sklearn.linear_model import PassiveAggressiveClassifier
-from sklearn.ensemble import AdaBoostClassifier
-from sklearn.linear_model import RidgeClassifier
-from sklearn.calibration import CalibratedClassifierCV
-from sklearn.linear_model import RidgeClassifier
 import joblib
 
 Trained_Data = pd.read_csv("NSL-KDD/KDDTrain+.txt" , sep = "," , encoding = 'utf-8')
@@ -83,7 +68,7 @@ Tested_Data['attack'] = attack_LE.fit_transform(Tested_Data["attack"])
 Trained_Data.drop_duplicates(subset=None, keep="first", inplace=True)
 Tested_Data.drop_duplicates(subset=None, keep="first", inplace=True)
 
-Trained_Data = pd.get_dummies(Trained_Data.drop(columns='attack'),columns=['protocol_type','service'],prefix="",prefix_sep="")
+Trained_Data = pd.get_dummies(Trained_Data, columns=['protocol_type','service'],prefix="",prefix_sep="")
 print(Trained_Data.columns)
 joblib.dump(Trained_Data.columns, 'dummy_columns.joblib')
 
@@ -91,36 +76,35 @@ Tested_Data = pd.get_dummies(Tested_Data,columns=['protocol_type','service'],pre
 
 X_train = Trained_Data.drop('attack', axis = 1)
 
-# X_test = Tested_Data.drop('attack', axis = 1)
+X_test = Tested_Data.drop('attack', axis = 1)
 
-# Y_train = Trained_Data['attack']
-# Y_test = Tested_Data['attack']
+Y_train = Trained_Data['attack']
+Y_test = Tested_Data['attack']
 
-# X_train_train,X_test_train ,Y_train_train,Y_test_train = train_test_split(X_train, Y_train, test_size= 0.25 , random_state=42)
-# X_train_test,X_test_test,Y_train_test,Y_test_test = train_test_split(X_test, Y_test, test_size= 0.25 , random_state=42)
+X_train_train,X_test_train ,Y_train_train,Y_test_train = train_test_split(X_train, Y_train, test_size= 0.25 , random_state=42)
+X_train_test,X_test_test,Y_train_test,Y_test_test = train_test_split(X_test, Y_test, test_size= 0.25 , random_state=42)
 
-# Ro_scaler = RobustScaler()
-# X_train_train = Ro_scaler.fit_transform(X_train_train) 
-# X_test_train= Ro_scaler.transform(X_test_train)
-# joblib.dump(Ro_scaler, 'scaler.joblib')
+Ro_scaler = RobustScaler()
+X_train_train = Ro_scaler.fit_transform(X_train_train) 
+joblib.dump(Ro_scaler, 'scaler.joblib')
+X_test_train= Ro_scaler.transform(X_test_train)
+X_train_test = Ro_scaler.fit_transform(X_train_test) 
+X_test_test= Ro_scaler.transform(X_test_test)
 
-# X_train_test = Ro_scaler.fit_transform(X_train_test) 
-# X_test_test= Ro_scaler.transform(X_test_test)
-
-# max_depth= [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+max_depth= [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
     
-# Parameters={ 'max_depth': max_depth}
+Parameters={ 'max_depth': max_depth}
 
-# def GridSearch(Model_Abb, Parameters, X_train, Y_train):
-#     Grid = GridSearchCV(estimator=Model_Abb, param_grid= Parameters, cv = 3, n_jobs=-1)
-#     Grid_Result = Grid.fit(X_train, Y_train)
-#     Model_Name = Grid_Result.best_estimator_
+def GridSearch(Model_Abb, Parameters, X_train, Y_train):
+    Grid = GridSearchCV(estimator=Model_Abb, param_grid= Parameters, cv = 3, n_jobs=-1)
+    Grid_Result = Grid.fit(X_train, Y_train)
+    Model_Name = Grid_Result.best_estimator_
     
-#     return (Model_Name)
+    return (Model_Name)
 
-# RF= RandomForestClassifier()
-# GridSearch(RF, Parameters, X_train_train, Y_train_train)
-# RF.fit(X_train_train, Y_train_train)
-# print(RF.score(X_train_train, Y_train_train))
-# print(RF.score(X_test_train, Y_test_train))
-# joblib.dump(RF, 'model.joblib')
+RF= RandomForestClassifier()
+GridSearch(RF, Parameters, X_train_train, Y_train_train)
+RF.fit(X_train_train, Y_train_train)
+print(RF.score(X_train_train, Y_train_train))
+print(RF.score(X_test_train, Y_test_train))
+joblib.dump(RF, 'model.joblib')

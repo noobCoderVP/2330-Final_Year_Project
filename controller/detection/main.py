@@ -5,12 +5,16 @@ from ryu.lib import hub
 from ryu.lib.packet import ipv4
 import switch
 from datetime import datetime, timedelta
+import joblib
+from websockets.sync.client import connect
+import numpy as np
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score
+import json
 
 SERVICE_TYPES = {
     0: 'eco_i',
@@ -29,13 +33,32 @@ SERVICE_TYPES = {
     8080: 'http'# Remote Desktop Protocol (RDP)
 }
 
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
+
 class SimpleMonitor13(switch.SimpleSwitch13):
 
     def __init__(self, *args, **kwargs):
         self.PROTOCOL_NAME = {1 : 'icmp', 6 : 'tcp', 17 : 'udp'}
         super(SimpleMonitor13, self).__init__(*args, **kwargs)
+        self.model = joblib.load("ML/model.joblib")
+        self.dummy_columns= joblib.load("ML/dummy_columns.joblib")
+        self.le_label = joblib.load("ML/label.joblib")
+        self.sc = joblib.load("ML/scaler.joblib")
         self.datapaths = {}
         self.monitor_thread = hub.spawn(self._monitor)
+        
+    def send_websocket_message(self, message):
+        with connect("ws://localhost:8765") as websocket:
+            websocket.send(message)
+            message = websocket.recv()
 
     @set_ev_cls(ofp_event.EventOFPStateChange,
                 [MAIN_DISPATCHER, DEAD_DISPATCHER])
@@ -158,23 +181,48 @@ class SimpleMonitor13(switch.SimpleSwitch13):
             #             packet_count_per_second,packet_count_per_nsecond,
             #             byte_count_per_second,byte_count_per_nsecond))
             
-        stats = []
+        stats = {
+            'duration': [],
+            'service': [],
+            'protocol_type': [],
+            'src_bytes': [],
+            'dst_bytes': [],
+            'count': [],
+            'srv_count': []
+        }
         current_time = datetime.now()
         for key, value in flows.items():
-            stat = {}
-            stat['duration'] = value['duration']
-            stat['service'] = value['service']
-            stat['protocol_type'] = key[2]
-            stat['src_bytes'] = value['bytes']
+            stats['duration'].append(value['duration'])
+            stats['service'].append(value['service'])
+            stats['protocol_type'].append(key[2])
+            stats['src_bytes'].append(value['bytes'])
             if flows[(key[1], key[0], protocol_type)]:
-                stat['dst_bytes'] = flows[(key[1], key[0], protocol_type)]['bytes']
+                stats['dst_bytes'].append(flows[(key[1], key[0], protocol_type)]['bytes'])
             else:
-                stat['dst_bytes'] = 0
-            stat['count'] = sum(1 for ts in counts[ip_dst] if (current_time - ts) < timedelta(seconds=2))
-            stat['srv_count'] = sum(1 for ts in srv_counts[tp_dst] if (current_time - ts) < timedelta(seconds=2))
-            stats.append(stat)
+                stats['dst_bytes'].append(0)
+            stats['count'].append(sum(1 for ts in counts[ip_dst] if (current_time - ts) < timedelta(seconds=2)))
+            stats['srv_count'].append(sum(1 for ts in srv_counts[tp_dst] if (current_time - ts) < timedelta(seconds=2)))
         
+        if len(stats['count']) == 0:
+            return
+        t = pd.DataFrame(stats)
+        new_data_encoded = pd.get_dummies(t)
+        # Reindex to match the training dummy columns
+        new_data_encoded = new_data_encoded.reindex(columns=self.dummy_columns, fill_value=0)
+        
+        print(new_data_encoded)
+        new_data_encoded = new_data_encoded.drop(columns=['attack'])
+        # t[:, 0] = le_proto.transform(t[:, 0])
+        t = self.sc.transform(new_data_encoded)
+        pred = self.model.predict(t)
+        print(pred)
+        original_label = self.le_label.inverse_transform(pred)[0]
+        print(original_label)
         self.logger.info('Features: \n')
+        for i in stats:
+            stats[i] = list(stats[i])
+        stats['attack'] = list(pred)
+        self.send_websocket_message(json.dumps(stats, cls=NpEncoder))
         self.logger.info(stats)
         # file0.close()
 
