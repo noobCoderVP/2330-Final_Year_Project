@@ -56,6 +56,8 @@ class SimpleMonitor13(switch.SimpleSwitch13):
         self.datapaths = {}
         self.db = pymongo.MongoClient('mongodb+srv://vaibhav:Vaibhav%40143@cluster0.nm9w35r.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0')['ids']
         self.monitor_thread = hub.spawn(self._monitor)
+        self.counts = {}
+        self.srv_counts = {}
         
     def send_websocket_message(self, message):
         with connect("ws://localhost:8765") as websocket:
@@ -105,8 +107,6 @@ class SimpleMonitor13(switch.SimpleSwitch13):
         tp_dst = 0
 
         flows = {}
-        counts = {}
-        srv_counts = {}
         for stat in sorted([flow for flow in body if (flow.priority == 1) ], key=lambda flow:
             (flow.match['eth_type'],flow.match['ipv4_src'],flow.match['ipv4_dst'],flow.match['ip_proto'])):
         
@@ -147,15 +147,15 @@ class SimpleMonitor13(switch.SimpleSwitch13):
             flows[(ip_src, ip_dst, protocol_type)]['duration'] = duration
             flows[(ip_src, ip_dst, protocol_type)]['service'] = service
                 
-            if ip_dst in counts:
-                counts[ip_dst].append(datetime.now())
+            if ip_dst in self.counts:
+                self.counts[ip_dst].append(datetime.now())
             else:
-                counts[ip_dst] = [datetime.now()]
+                self.counts[ip_dst] = [datetime.now()]
                 
-            if tp_dst in srv_counts:
-                srv_counts[tp_dst].append(datetime.now())
+            if tp_dst in self.srv_counts:
+                self.srv_counts[tp_dst].append(datetime.now())
             else:
-                srv_counts[tp_dst] = [datetime.now()]
+                self.srv_counts[tp_dst] = [datetime.now()]
                 
 
             flow_id = str(ip_src) + str(tp_src) + str(ip_dst) + str(tp_dst) + str(ip_proto)
@@ -199,12 +199,12 @@ class SimpleMonitor13(switch.SimpleSwitch13):
             stats['service'].append(value['service'])
             stats['protocol_type'].append(key[2])
             stats['src_bytes'].append(value['bytes'])
-            if flows[(key[1], key[0], protocol_type)]:
+            if (key[1], key[0], protocol_type) in flows:
                 stats['dst_bytes'].append(flows[(key[1], key[0], protocol_type)]['bytes'])
             else:
                 stats['dst_bytes'].append(0)
-            stats['count'].append(sum(1 for ts in counts[ip_dst] if (current_time - ts) < timedelta(seconds=2)))
-            stats['srv_count'].append(sum(1 for ts in srv_counts[tp_dst] if (current_time - ts) < timedelta(seconds=2)))
+            stats['count'].append(sum(1 for ts in self.counts[ip_dst] if (current_time - ts) < timedelta(seconds=2)))
+            stats['srv_count'].append(sum(1 for ts in self.srv_counts[tp_dst] if (current_time - ts) < timedelta(seconds=2)))
             stats['timestamp'].append(datetime.now().isoformat())
         
         if len(stats['count']) == 0:
