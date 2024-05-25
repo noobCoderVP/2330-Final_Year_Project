@@ -1,11 +1,12 @@
 import joblib
 import numpy as np
 import pandas as pd
+import os
 
-model = joblib.load("model.joblib")
-le_proto = joblib.load("dummy_columns.joblib")
-le_label = joblib.load("label.joblib")
-sc = joblib.load("scaler.joblib")
+model = joblib.load("ML/model.joblib")
+dummy_columns = joblib.load("ML/dummy_columns.joblib")
+le_label = joblib.load("ML/label.joblib")
+sc = joblib.load("ML/scaler.joblib")
 
 t = pd.DataFrame({
     'duration': [0],
@@ -18,7 +19,7 @@ t = pd.DataFrame({
 })
 
 # t = np.array([t])
-dummy_columns = joblib.load('dummy_columns.joblib')
+# dummy_columns = joblib.load('dummy_columns.joblib')
 print(dummy_columns)
 new_data_encoded = pd.get_dummies(t)
 
@@ -32,5 +33,6 @@ t = sc.transform(new_data_encoded)
 
 pred = model.predict(t)
 original_label = le_label.inverse_transform(pred)[0]
+print(le_label.inverse_transform([0, 1, 2, 3, 4]))
 print(original_label)
 # print(t)
