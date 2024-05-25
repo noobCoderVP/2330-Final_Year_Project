@@ -226,7 +226,7 @@ class SimpleMonitor13(switch.SimpleSwitch13):
         for i in stats:
             stats[i] = list(stats[i])
         stats['attack'] = list(pred)
-        self.send_websocket_message(json.dumps(stats, cls=NpEncoder))
+        self.send_websocket_message(json.dumps({'type': 'alert', 'data': pd.DataFrame(stats).to_dict(orient='records')}, cls=NpEncoder))
         self.db['logs'].insert_many(pd.DataFrame(stats).to_dict(orient='records'))
         print('inserted')
         self.logger.info(stats)

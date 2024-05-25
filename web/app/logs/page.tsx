@@ -1,26 +1,60 @@
-"use client";
-import {
-    Table,
-    TableHeader,
-    TableColumn,
-    TableBody,
-    TableRow,
-    TableCell,
-    Pagination,
-    getKeyValue,
-} from "@nextui-org/react";
-import { useEffect, useState, useMemo } from "react";
+"use client"
+import Image from "next/image";
+import { useEffect, useState } from "react";
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import axios from "axios";
 
-interface Log{
-    timestamp: string;
-    switchid: number;
-    source: string;
-    destination: string;
-    in_port: number;
+interface log {
+  index: number;
+  duration: number;
+  service: string;
+  protocol_type: string;
+  src_bytes: number;
+  dst_bytes: number;
+  count: number;
+  srv_count: number;
 }
 
+const attacks = ['Dos', 'Probe', 'R2L', 'U2R', 'normal'];
+
+const COLUMNS: GridColDef[] = [
+//     { 
+//   field: 'index', 
+//   headerName: 'Index', 
+//   width: 70, 
+//   valueGetter: (params) => params.row.index + 1
+// },
+{ field: 'timestamp', headerName: 'Timestamp', width: 220 },
+{ field: 'switchid', headerName: 'Switch ID', width: 150 },
+{ field: 'source', headerName: 'Source IP', width: 150 },
+{ field: 'destination', headerName: 'Destination IP', width: 150 },
+{ field: 'size', headerName: 'Packet Size', width: 150 },
+{ field: 'in_port', headerName: 'Input Port', width: 150 },
+]
+
+const rows = [
+  { id: 1, lastName: 'Snow', firstName: 'Jon', age: 35 },
+  { id: 2, lastName: 'Lannister', firstName: 'Cersei', age: 42 },
+  { id: 3, lastName: 'Lannister', firstName: 'Jaime', age: 45 },
+  { id: 4, lastName: 'Stark', firstName: 'Arya', age: 16 },
+  { id: 5, lastName: 'Targaryen', firstName: 'Daenerys', age: null },
+  { id: 6, lastName: 'Melisandre', firstName: null, age: 150 },
+  { id: 7, lastName: 'Clifford', firstName: 'Ferrara', age: 44 },
+  { id: 8, lastName: 'Frances', firstName: 'Rossini', age: 36 },
+  { id: 9, lastName: 'Roxie', firstName: 'Harvey', age: 65 },
+];
+
+
 export default function Home() {
-    const [messages, setMessages] = useState<Log[]>([]);
+    const [logs, setLogs] = useState<log[]>([]);
+
+    const fetchLogs = async () => {
+      const result = await axios.get('http://localhost:8000/fetch');
+      const data = result.data;
+      // @ts-ignore
+      setLogs(data.map((row, index: number) => ({ ...row, index })));
+      console.log(result);
+    }
 
     useEffect(() => {
         const socket = new WebSocket("ws://localhost:8765");
@@ -30,75 +64,46 @@ export default function Home() {
         };
 
         socket.onmessage = (event) => {
-            const message = event.data;
-            console.log(message);
-            setMessages((prevMessages) => [
-                ...prevMessages,
-                JSON.parse(message),
-            ]);
+            const result = JSON.parse(event.data);
+            if(result.type == 'log')
+            {
+                console.log(result.data);
+                setLogs((prevLogs) => [...prevLogs, result.data]);
+            }
         };
-
+        
         return () => {
-            socket.close();
+          socket.close();
         };
-    }, []);
+      }, []);
 
-    const [page, setPage] = useState(1);
-    const rowsPerPage = 4;
-
-    const pages = Math.ceil(messages.length / rowsPerPage);
-
-    const items = useMemo(() => {
-        const start = (page - 1) * rowsPerPage;
-        const end = start + rowsPerPage;
-
-        return messages.slice(start, end);
-    }, [page, messages]);
-
+    const onButtonClick = () => {
+      const socket = new WebSocket("ws://localhost:8765");
+      console.log(logs);
+      socket.onopen = () => {
+        socket.send("Hello world 2");
+        console.log("Message sent");
+      };
+    }
     return (
         <main>
-            <div>
-                <h1 className="px-4 py-2 bg-black text-white">
-                    Controller logs
-                </h1>
-                <Table
-                    aria-label="Logs of controller"
-                    bottomContent={
-                        <div className="flex w-full justify-center">
-                            <Pagination
-                                isCompact
-                                showControls
-                                showShadow
-                                color="secondary"
-                                page={page}
-                                total={pages}
-                                onChange={(page) => setPage(page)}
-                            />
-                        </div>
-                    }
-                    classNames={{
-                        wrapper: "min-h-[222px]",
-                    }}
-                >
-                    <TableHeader>
-                        <TableColumn key="timestamp">Timestamp</TableColumn>
-                        <TableColumn key="switchid">Switch ID</TableColumn>
-                        <TableColumn key="source">Source</TableColumn>
-                        <TableColumn key="destination">Destination</TableColumn>
-                        <TableColumn key="in_port">Input port</TableColumn>
-                    </TableHeader>
-                    <TableBody items={items}>
-                        {(item) => (
-                            <TableRow key={item.timestamp}>
-                                {(columnKey) => (
-                                    <TableCell>
-                                        {getKeyValue(item, columnKey)}
-                                    </TableCell>
-                                )}
-                            </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
+            <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
+            <h1 className="px-4 py-2 bg-blue-600 text-white m-2">Live Controller Logs</h1>
+              <div style={{ height: '80vh'}}>
+              <DataGrid
+                style={{minHeight: 400}}
+                rows={logs}
+                columns={COLUMNS}
+                getRowId={(row) => row.timestamp}
+                initialState={{
+                  pagination: {
+                    paginationModel: { page: 0, pageSize: 10 },
+                  },
+                }}
+                // pageSizeOptions={[5, 10]}
+                autoPageSize
+              />
+            </div>
             </div>
         </main>
     );

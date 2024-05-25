@@ -65,12 +65,6 @@ export default function Home() {
             console.log("WebSocket connected!");
         };
 
-        socket.onmessage = (event) => {
-            const message = event.data;
-            console.log(message);
-            setLogs((prevMessages) => [...prevMessages, message]);
-        };
-
         fetchLogs();
         
         return () => {

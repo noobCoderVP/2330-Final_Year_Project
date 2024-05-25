@@ -2,27 +2,38 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import axios from "axios";
 
-const columns: GridColDef[] = [
-  { field: 'id', headerName: 'ID', width: 70 },
-  { field: 'firstName', headerName: 'First name', width: 130 },
-  { field: 'lastName', headerName: 'Last name', width: 130 },
-  {
-    field: 'age',
-    headerName: 'Age',
-    type: 'number',
-    width: 90,
+interface log {
+  index: number;
+  duration: number;
+  service: string;
+  protocol_type: string;
+  src_bytes: number;
+  dst_bytes: number;
+  count: number;
+  srv_count: number;
+}
+
+const attacks = ['Dos', 'Probe', 'R2L', 'U2R', 'normal'];
+
+const COLUMNS: GridColDef[] = [
+  { 
+    field: 'index', 
+    headerName: 'Index', 
+    width: 70, 
+    valueGetter: (params) => params.row.index + 1
   },
-  {
-    field: 'fullName',
-    headerName: 'Full name',
-    description: 'This column has a value getter and is not sortable.',
-    sortable: false,
-    width: 160,
-    // @ts-ignore
-    valueGetter: (value, row) => { return `${row? row.firstName: ''} ${row? row.lastName: ''}`},
-  },
-];
+{ field: 'timestamp', headerName: 'Timestamp', width: 220 },
+{ field: 'duration', headerName: 'Duration', width: 100 },
+{ field: 'service', headerName: 'Service', width: 100 },
+{ field: 'protocol_type', headerName: 'Protocol Type', width: 120 },
+{ field: 'src_bytes', headerName: 'Source Bytes', width: 150 },
+{ field: 'dst_bytes', headerName: 'Destination Bytes', width: 150 },
+{ field: 'count', headerName: 'Count', width: 100 },
+{ field: 'srv_count', headerName: 'Service Count', width: 120 },
+{ field: 'attack', headerName: 'Attack', width: 100, valueGetter: (params) => attacks[params.row.attack] },
+]
 
 const rows = [
   { id: 1, lastName: 'Snow', firstName: 'Jon', age: 35 },
@@ -38,7 +49,14 @@ const rows = [
 
 
 export default function Home() {
-    const [messages, setMessages] = useState<string[]>([]);
+    const [logs, setLogs] = useState<log[]>([]);
+
+    const fetchLogs = async () => {
+      const result = await axios.get('http://localhost:8000/fetch');
+      const data = result.data;
+      // @ts-ignore
+      setLogs(data.map((row, index: number) => ({ ...row, index })));
+    }
 
     useEffect(() => {
         const socket = new WebSocket("ws://localhost:8765");
@@ -48,11 +66,18 @@ export default function Home() {
         };
 
         socket.onmessage = (event) => {
-            const message = event.data;
-            console.log(message);
-            setMessages((prevMessages) => [...prevMessages, message]);
+            let result = JSON.parse(event.data);
+            if(result && result.type === 'alert')
+            {
+              console.log(result.data);
+              console.log("Logs ", logs);
+              setLogs((prevLogs) => {
+                return [...prevLogs, ...result.data].map((value, index) => ({...value, index: index}));
+              });
+            }
         };
 
+        // fetchLogs();
         
         return () => {
           socket.close();
@@ -61,7 +86,7 @@ export default function Home() {
 
     const onButtonClick = () => {
       const socket = new WebSocket("ws://localhost:8765");
-      console.log(messages);
+      console.log(logs);
       socket.onopen = () => {
         socket.send("Hello world 2");
         console.log("Message sent");
@@ -69,19 +94,20 @@ export default function Home() {
     }
     return (
         <main>
-            <div>
-              <h1>Alerts</h1>
-              <div style={{ height: 400, width: '100%' }}>
+            <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
+            <h1 className="px-4 py-2 bg-red-600 text-white m-2">Live Alerts</h1>
+              <div style={{ height: '80vh'}}>
               <DataGrid
-                rows={rows}
-                columns={columns}
+                rows={logs}
+                columns={COLUMNS}
+                getRowId={(row) => row.index}
                 initialState={{
                   pagination: {
-                    paginationModel: { page: 0, pageSize: 5 },
+                    paginationModel: { page: 0, pageSize: 10 },
                   },
                 }}
-                pageSizeOptions={[5, 10]}
-                checkboxSelection
+                // pageSizeOptions={[5, 10]}
+                autoPageSize
               />
             </div>
             </div>

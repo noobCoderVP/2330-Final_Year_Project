@@ -97,7 +97,8 @@ class SimpleSwitch13(app_manager.RyuApp):
         log['source'] = src
         log['destination'] = dst
         log['in_port'] = in_port
-        self.send_websocket_message(json.dumps(log))
+        log['size'] = ev.msg.total_len
+        self.send_websocket_message(json.dumps({'type': 'log', 'data': log}))
 
         # * learn a mac address to avoid FLOOD next time.
         self.mac_to_port[dpid][src] = in_port
