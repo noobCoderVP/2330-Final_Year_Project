@@ -55,10 +55,6 @@ change_label(Trained_Data)
 change_label(Tested_Data)
 print(Trained_Data.head(5))
 
-
-
-# # label encoding (0,1,2,3,4) multi-class labels (Dos,normal,Probe,R2L,U2R)
-# # LE = LabelEncoder()
 attack_LE= LabelEncoder()
 Trained_Data['attack'] = attack_LE.fit_transform(Trained_Data["attack"])
 joblib.dump(attack_LE, 'label.joblib')

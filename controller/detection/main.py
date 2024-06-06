@@ -98,8 +98,6 @@ class SimpleMonitor13(switch.SimpleSwitch13):
         timestamp = datetime.now()
         timestamp = timestamp.timestamp()
 
-        # file0 = open("PredictFlowStatsfile.csv","w")
-        # print('timestamp,datapath_id,flow_id,ip_src,tp_src,ip_dst,tp_dst,ip_proto,icmp_code,icmp_type,flow_duration_sec,flow_duration_nsec,idle_timeout,hard_timeout,flags,packet_count,byte_count,packet_count_per_second,packet_count_per_nsecond,byte_count_per_second,byte_count_per_nsecond\n')
         body = ev.msg.body
         icmp_code = -1
         icmp_type = -1
@@ -173,16 +171,7 @@ class SimpleMonitor13(switch.SimpleSwitch13):
             except:
                 byte_count_per_second = 0
                 byte_count_per_nsecond = 0
-                
-            # print("{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n"
-            #     .format(timestamp, ev.msg.datapath.id, flow_id, ip_src, tp_src,ip_dst, tp_dst,
-            #             stat.match['ip_proto'],icmp_code,icmp_type,
-            #             stat.duration_sec, stat.duration_nsec,
-            #             stat.idle_timeout, stat.hard_timeout,
-            #             stat.flags, stat.packet_count,stat.byte_count,
-            #             packet_count_per_second,packet_count_per_nsecond,
-            #             byte_count_per_second,byte_count_per_nsecond))
-            
+                          
         stats = {
             'duration': [],
             'service': [],
