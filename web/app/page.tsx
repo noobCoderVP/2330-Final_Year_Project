@@ -1,4 +1,5 @@
 "use client";
+import Head from "next/head";
 import { ReactEventHandler, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast, ToastContainer } from "react-toastify";
@@ -17,7 +18,8 @@ export default function Home() {
             console.log("WebSocket connected!");
         };
 
-        toast.info("Login first");
+        if (localStorage.getItem("password") != "vaibhav")
+            toast.info("Login first");
 
         socket.onmessage = (event) => {
             const message = event.data;
@@ -52,6 +54,9 @@ export default function Home() {
 
     return (
         <section className="bg-gray-50 dark:bg-gray-900">
+            <Head>
+                <title>Alert Manager</title>
+            </Head>
             <ToastContainer />
             <div className="flex flex-col items-center justify-center px-6 py-8 mx-auto md:h-screen lg:py-0">
                 <a

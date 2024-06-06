@@ -3,7 +3,9 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { DataGrid, GridColDef } from "@mui/x-data-grid";
 import { useRouter } from "next/navigation";
+import { Audio } from "react-loader-spinner";
 import axios from "axios";
+import "react-toastify/dist/ReactToastify.css";
 
 interface log {
     index: number;
@@ -47,6 +49,7 @@ const rows = [
 
 export default function Home() {
     const [logs, setLogs] = useState<log[]>([]);
+    const [loaded, setLoaded] = useState(false);
     const router = useRouter();
 
     const fetchLogs = async () => {
@@ -75,19 +78,37 @@ export default function Home() {
             }
         };
 
+        setLoaded(true);
+
         return () => {
             socket.close();
         };
     }, []);
 
-    const onButtonClick = () => {
-        const socket = new WebSocket("ws://localhost:8765");
-        console.log(logs);
-        socket.onopen = () => {
-            socket.send("Hello world 2");
-            console.log("Message sent");
-        };
-    };
+    if (!loaded)
+        return (
+            <div
+                style={{
+                    width: "98vw",
+                    height: "80vh",
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                }}
+            >
+                <Audio
+                    height="200"
+                    width="200"
+                    radius="20"
+                    color="green"
+                    ariaLabel="three-dots-loading"
+                    // @ts-ignore
+                    wrapperStyle
+                    // @ts-ignore
+                    wrapperClass
+                />
+            </div>
+        );
     return (
         <main>
             <div

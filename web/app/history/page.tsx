@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { DataGrid, GridColDef } from "@mui/x-data-grid";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import "react-toastify/dist/ReactToastify.css";
 
 interface log {
     index: number;

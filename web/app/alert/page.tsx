@@ -1,9 +1,10 @@
 "use client";
-import Image from "next/image";
 import { useEffect, useState } from "react";
 import { DataGrid, GridColDef } from "@mui/x-data-grid";
 import { useRouter } from "next/navigation";
 import axios from "axios";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 interface log {
     index: number;
@@ -41,18 +42,6 @@ const COLUMNS: GridColDef[] = [
     },
 ];
 
-const rows = [
-    { id: 1, lastName: "Snow", firstName: "Jon", age: 35 },
-    { id: 2, lastName: "Lannister", firstName: "Cersei", age: 42 },
-    { id: 3, lastName: "Lannister", firstName: "Jaime", age: 45 },
-    { id: 4, lastName: "Stark", firstName: "Arya", age: 16 },
-    { id: 5, lastName: "Targaryen", firstName: "Daenerys", age: null },
-    { id: 6, lastName: "Melisandre", firstName: null, age: 150 },
-    { id: 7, lastName: "Clifford", firstName: "Ferrara", age: 44 },
-    { id: 8, lastName: "Frances", firstName: "Rossini", age: 36 },
-    { id: 9, lastName: "Roxie", firstName: "Harvey", age: 65 },
-];
-
 export default function Home() {
     const [logs, setLogs] = useState<log[]>([]);
     const router = useRouter();
@@ -78,7 +67,7 @@ export default function Home() {
             let result = JSON.parse(event.data);
             if (result && result.type === "alert") {
                 console.log(result.data);
-                console.log("Logs ", logs);
+                toast.error("Attack has occured!");
                 setLogs((prevLogs) => {
                     return [...prevLogs, ...result.data].map(
                         (value, index) => ({ ...value, index: index })
@@ -94,16 +83,9 @@ export default function Home() {
         };
     }, []);
 
-    const onButtonClick = () => {
-        const socket = new WebSocket("ws://localhost:8765");
-        console.log(logs);
-        socket.onopen = () => {
-            socket.send("Hello world 2");
-            console.log("Message sent");
-        };
-    };
     return (
         <main>
+            <ToastContainer />
             <div
                 style={{
                     display: "flex",
